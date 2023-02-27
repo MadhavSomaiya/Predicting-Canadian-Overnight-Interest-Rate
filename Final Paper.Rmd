@@ -1,0 +1,414 @@
+---
+title: "Machine Learning Approach for Predicting Canadian Overnight Interest Rate"
+author: "Madhav Somaiya"
+date: "2022-12-14"
+output: pdf_document
+---
+
+# Abstract
+
+The goal of this paper is to develop a Ridge Regression and Best Subset model and compare its prediction accuracy on Canadian Overnight Interest rates (COIR) to the prediction accuracy of the Random Forest model. The plan is to find the mean squared error (MSE) and the root means squared error (RMSE) to assess the prediction accuracy of the models. We find the best fit for our data by comparing these measures and choosing the lowest value. In this paper, we successfully create models for the Best subset, Ridge, and Random Forest models, and conclude that Random forests are the best fit model that can predict the Canadian Overnight Interest Rate.
+
+# Introduction
+
+Economic institutions are believed to be the heart of a society, that allocates limited resources efficiently within a group as well as incentives people to trade off leisure to work so they can consume more in the future. A branch of this institution is commercial banks which acts as an intermediary in the money market where they borrow from the government and lend money to the people. Where they have a high incentive to make profits from such transactions. To control that, Central Banks employ tools like Overnight lending rates to regulate the money supply. The overnight Lending rate is the interest rate at which a commercial bank lends or borrows funds from another depository institution in the overnight market. Overnight lending means that the borrower repays the respective amount including interest at the beginning of the following business day. A low-interest rate suggests banks can borrow money at a low cost, so banks would charge lower interest rates to their customers, thus encouraging them to take loans. This allows people to spend more than their current income thus assisting countries to bounce back from lower economic activities such as inflation, less business, and the overall standing of the country in the global economy. This paper will overview the relevancy of the reference paper used, explains the data and its sources and uses the Best Subset, Ridge Regression, Random Forest, and Gradient Boosting model and select the best model fit based on MAE and RMSE values to provide a conclusive statement on the prediction problem. In this paper, we will use the mentioned machine learning models to determine if the covariates used are good predictors for Canadian Overnight Lending Rate.\
+
+## Literature Review
+
+In the Paper 'A machine learning approach to one-step overnight interest rate forecasting' by Christina Caspari from the University of Twente. The author does one-step forecasting using Autoregressive Integrated Moving Average (ARIMA) and successfully forecasts the overnight interest rates Sterling Overnight Index Average (SONIA), the Euro Short-Term Rate (€STR), and the Secured Overnight Financing Rate (SOFR). They use Random Forest supervised machine learning model and compare test data with the results from the historical data and suggested that using the ARIMA model is theoretically cheaper and can be fine-tuned with ease compared to Random Forest. This paper is relevant to my paper as I am aiming to predict Canadian overnight rates but with Ridge regression and other machine learning methods like Random forests and Gradient Boosting Model.
+
+# Data Description
+
+The covariates I am using in this paper are Total CPI, CPI trim, CPI median, CPI common, LFS, SEPH, Real Return Bonds, Nominal CEER, Gross M1, Gross M2, Gross M3, GDP Index, Canadian Overnight Repo Rate, Immediate Interbank rate, Unemployment Rate, Prime Rate. This data is in a continuous quantitative format as the change in the variable is between two whole numbers. The data used here is from the Bank of Canada's (BOC) official website, Federal Reserve Economic Data (FRED), and a Personal Finance Encyclopedia called Wowa. Wowa was used to find the prime rate at which commercial banks loan money to their consumers. FRED was used to find Canada's GDP index and Unemployment rate. And the remaining variables were extracted from BOC's website. The data frequency is monthly from 1st January 1999 to 1st October 2022 and the data set is in percentage.
+
+| Variables                    | Definition                                                                                                                                                | Relevance                                                                       |
+|------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------|
+| Total CPI                    | Represents change in prices experienced by consumers in Canada.                                                                                           | Shows consumption pattern of Canadians as overnight rate changes.               |
+| CPI trim                     | This filters out extreme price movements by deleting 20% from both tails of the total CPI distribution.                                                   | Provides a core change in the consumption pattern.                              |
+| CPI median                   | Measures Total CPI corresponding to the price change located at the 50th percentile.                                                                      | Provides a change in consumption at 50th percentile.                            |
+| CPI common                   | Tracks common price changes across CPI basket categories.                                                                                                 | Filters out factor specific changes from CPI.                                   |
+| LFS                          | Hourly Salary of employees at their main job before Deduction.                                                                                            | Assists in seeing how earning changes as Overnight rate changes.                |
+| SEPH                         | Employers payroll data before deductions.                                                                                                                 | Assists in covering the entire labor force's hourly earning.                    |
+| Real Return Bonds            | Calculates the difference in value for long term bonds                                                                                                    | Change in Investment trends as Overnight rate increases.                        |
+| Nominal CEER                 | Weighted average of exchange rates for the Canadian dollar.                                                                                               | provides a weighted average of Canadian dollar value.                           |
+| Gross M1                     | Currency outside banks plus personal and non-personal chequable deposits held at chartered banks plus all chequable deposits.                             | Shows how much Banks lend to people.                                            |
+| Gross M2                     | Gross M1 plus non-chequable notice deposits held at chartered banks plus all non-chequable deposits.                                                      | Shows how much banks can use for buying funds from each other.                  |
+| Gross M3                     | Gross M2 plus Canada Savings Bonds plus cumulative net contributions to mutual funds other than Canadian dollar money market mutual funds.                | Show how much Canadian money is outside Canada.                                 |
+| GDP Index                    | Shows the percentage change in GDP of Canada.                                                                                                             | Shows the gross growth in Canada.                                               |
+| Canadian Overnight Repo Rate | Measures the cost of overnight funding in Canadian dollars using Government of Canada treasury bills and bonds as collateral for repurchase transactions. | Shows the rate at which BOC repurchases the bonds sold in the Overnight market. |
+| Immediate Inter bank rate    | Interest Rate on transaction between banks for less than 24Hrs.                                                                                           | Compares the interest rates banks provides each other in the day market.        |
+| Unemployment Rate            | Unemployment Rate in Canada in percentage.                                                                                                                | Provides unemployment trends in Canada.                                         |
+| Prime Rate                   | Rate at which commercial banks provide loans to their customers.                                                                                          | Shows the Profit gained by banks.                                               |
+
+: Variable list
+
+These variables can be compiled into 3 groups: Interest Rates, Money Market, and Consumption. They are relevant for predicting overnight rates as the Bank of Canada uses these variables to create its monetary policies which affect the rate at which commercial banks lend money to the people. In addition, these variables show if the Canadian economy is in inflation which the monetary policies attempt to combat.
+
+```{r libraries, include=FALSE}
+options(tinytex.verbose = TRUE)
+library(Metrics)
+library(tidyverse)
+library(rmarkdown)
+library(nycflights13)
+library(lubridate)
+library(Lock5Data)
+library(crimedata)
+library(fivethirtyeight)
+library(latex2exp)
+library(ISLR)
+library(stargazer)
+library(MASS)
+library(data.table)
+library(randomForest)
+library(kernlab)    
+library(party)
+library(tree)
+library(rpart)     
+library(rpart.plot) 
+library(ggdendro)  
+library(factoextra)
+library(corrplot)
+library(readxl)
+library(glmnet)
+library(np)
+library(pls)
+library(FactoMineR)
+library(car)
+library(modelr)
+library(leaps)
+library(FNN)
+library(ROCR)         
+library(e1071) 
+library(wooldridge)
+library(AER)
+library(nlme)
+library(rdd)
+```
+
+# Methodology
+
+In order to use the data set without complications, we would first need to clean our data of any discrepancies. In this case, there are some variables that do not have data for certain times. To avoid this problem we use `na.omit()` function to drop the N/A observations. In addition, the Date column has been dropped as it will complicate our analysis.
+
+```{r data set, echo=FALSE, out.width='70%'}
+Data<- read_excel("Data_for_paper.xlsx")
+Data2 <- na.omit(Data) # Dropping the N/A observations
+Data3 <- Data2 [,-1] # droping the Date variable 
+head (Data3)
+```
+
+Since our goal it to predict if the model selected we would need to partition out data set into training data and test data. Training data will be used to train our selected models, and the test data will be used to test our model and see if the model selected is a good fit for our prediction problem
+
+```{r data partition, echo=FALSE}
+set.seed(905)
+#using 80% of the data set for training the models
+index <- sample(1:nrow(Data3), nrow(Data3)*0.8, replace = FALSE)
+train <- Data3[index, ]
+train_Overnight <- train$Overnightrate
+dim(train)
+test <- Data3[-index, ]
+test_overnight <- test$Overnightrate
+dim (test)
+  
+```
+
+```{r functions, include=FALSE}
+MSE <- function(y, fhat)
+ {
+   mse <- mean((y - fhat)^2)
+   return (mse)}
+
+getRMSE <- function(actual, preds){ 
+    mse= mean( (actual-preds)^2 )
+    return( sqrt(mse) )}
+
+```
+
+We observe that the train data has 217 observations which is 80% of the data set, while the test data has 55 observations which is the remaining 20% of the data set.
+
+## 1. Model Creation
+
+In this section we will create Best subset, Ridge regression, Random forest models and interpret each models' performance using information criterion, to determine how many covariates would be optimal for our predictions.
+
+### a. Best Subset Model
+
+For the Best subset model creation we use `(leaps)` package to use the function `regsubset()`. Here nvmax is the total number of covariates we have in the model, in this case it is 16.
+
+```{r bestsubset, out.width='70%'}
+bestsub.model <- regsubsets(Overnightrate ~ ., 
+                            data = Data3, 
+                            nvmax = 16)
+#summary (bestsub.model)
+```
+
+From the output we find that the top 1 predictor is Immediate inter bank rate, and the top 8 predictors are: Immediate inter bank rate, Prime rate, SEPH, Real Return bonds, CPI common, CPI trim, CPI median, and Gross M3. To make sure we are using the optimum number of variable we look at the performance measure of this using the information criterion Complexity parameters (Cp), $R^2$, $Adjusted R^2$, and Bayesian Information Criterion (BIC).
+
+```{r echo=FALSE}
+#Performance measures
+  cbind( 
+    Cp     = summary(bestsub.model)$cp,
+    r2     = summary(bestsub.model)$rsq,
+    Adj_r2 = summary(bestsub.model)$adjr2,
+    BIC    =summary(bestsub.model)$bic
+)
+```
+
+From this values we can observe that the best amount of variables used here would be 8 as the Cp does not decrease after 8 variables. Suggesting that adding a new covariate would not help the fit of the model.
+
+### b. Ridge Regression
+
+Ridge Regression uses the penalty term $lambda=l$ to combat the potential multicollinearity in our highly dimensional data sets. Here our goal is to minimize $RSS + l*Sum(B^2_j)$ where $B= Beta_j$. Here, j ranges from 1 to $l>=0$ here the second term is known as the shrinkage penalty term. Ridge regression is a method of estimating the coefficients of multiple-regression models in scenarios where the independent variables are highly correlated. To find the optimum $l$ by selecting the value that produces the lowest possible Root Mean Squared Error.
+
+```{r ridge model creation, echo=TRUE}
+#define response variable
+y <- Data3$Overnightrate
+
+#define matrix of predictor variables
+x <- data.matrix(Data3[, c('TotalCPI', 'CPItrim', 'CPImedian', 'CPIcommon', 'RealReturnbonds' ,'LFS', 'SEPH', 'NominalCEER', 'GrossM1', 'GrossM2', 'GrossM3', 'GDPIndex', 'CanadianOvernightRepoRate', 'ImmediateInterbankrate', 'UnemploymentRate', 'Primerate')])
+
+#fit ridge regression model
+model <- glmnet(x, y, alpha = 0)
+
+```
+
+We use package `cv.glmnet` to do cross validation on our model to find the optimum lambda and to tackle overfitting of our data. We use the k-fold validation method, where k=10. Here the value is 0.1523224. We then use the `best_lambda` to find the coefficients of the best model. And we use the best lambda to calculate the R-squared of the training data.
+
+```{r echo=TRUE}
+#perform k-fold cross-validation to find optimal lambda value
+cv_model <- cv.glmnet(x, y, alpha = 0)
+
+#find optimal lambda value that minimizes test MSE
+best_lambda <- cv_model$lambda.min
+best_lambda
+```
+
+To estimate the effect on the Overnight rate by the coefficients. We show the estimates for this model at the optimal lambda. This shows the correlation between the Overnight rates and the other predictors.
+
+```{r echo=FALSE}
+#find coefficients of best model
+best_model <- glmnet(x, y, alpha = 0, lambda = best_lambda)
+coef(best_model)
+```
+
+```{r echo=FALSE}
+#produce Ridge trace plot
+plot(cv_model)
+```
+
+The plot shows the process of cross validation to make sure we are not overfitting the data. The r-squared we get for the best model was able to explain **99.54874%** of the variation in the response values of the training data. Which shows that this model would perform well for our training dataset.
+
+```{r echo=FALSE}
+#use fitted best model to make predictions
+y_predicted <- predict(model, s = best_lambda, newx = x, newdata= train)
+
+#Calculate SST and SSE 
+sst <- sum((y - mean(y))^2)
+sse <- sum((y_predicted - y)^2)
+
+#find R-Squared to find the fit of the model
+rsq <- 1 - sse/sst
+rsq
+
+```
+
+### c. Random Forest
+
+Random forest uses random bootstrap samples it is not affected by multicollinearity to a large extent of our data-set. Here we use the library `caret` which automatically finds the best parameter value for the number of predictors and using `oob` function which is the Out of bag error criteria that determines the average error for each calculated sample. This function simplifies our code and allows us to tune our model.
+
+```{r random forest tuning, echo=TRUE}
+library(caret)
+oob = trainControl(method = "oob")
+rf_grid_mtry =  expand.grid(mtry = 2:16)
+
+set.seed(825)
+rf.tune = train(Overnightrate~ ., data = Data3,
+                     method = "rf",
+                     trControl = oob,
+                     verbose = FALSE,
+                     tuneGrid = rf_grid_mtry)
+
+rf.tune
+plot(rf.tune)
+```
+
+The best number of predictors in this model is 12. However, comparing with the best subset selection model which had 8 as the optimal number of predictors, we decide to use 9 in the random forest since after 9 variables there negligible difference in the plot for the Root Mean squared Error(RMSE) re-sampling from the oob .
+
+```{r echo=FALSE}
+set.seed(1010)
+rf.mod <- randomForest(Overnightrate ~ ., 
+                      data = train, 
+                      mtry = 9, 
+                      type="regression", 
+                      importance = TRUE, 
+                      ntrees = 500)
+importance(rf.mod)
+```
+
+We use the `importance` function to find which covariates are the most important. In this case we have Immediate Inter-bank Rate to be the most important covariate and the top 9 important predictors are Immediate Inter-bank Rate, Primerate, Canadian Overnight Rate Repo Rate, Nominal CEER, SEPH, Gross M1, Gross M3, Gross M2, and Unemployment Rate.
+
+## 2. Model Selection and Prediction
+
+This section engages in Model selection where we use the important variables found from Best subset, Ridge, and Random Forest and use them to predict on the test data, and find the RMSE values of these models. The RMSE can be understood as the standard deviation of the residuals. And by minimizing RMSE we can find the best model fit for our data-set. Additionally, we compare the predictions of the test data set for the non-linear models only as the linear models have potential sampling bias. In this case, we only compare Random forest, and Gradient boosting Models.
+
+The Best-subset model uses linear regression as this method works best with a linear function.
+
+```{r bestsubset RMSE, echo=TRUE}
+# Create a Linear function
+bs.lm.mod <- lm(Overnightrate~ ImmediateInterbankrate+ Primerate+ SEPH+ RealReturnbonds+ CPIcommon+ CPItrim+ CPImedian +GrossM3, data=train)
+
+# Predict using training data and test data 
+bs.pred.train <- predict(bs.lm.mod,newdata=train)
+bs.pred.test <- predict(bs.lm.mod,newdata=test)
+#Find the RMSE 
+bs.rmse.train <- getRMSE(train$Overnightrate,bs.pred.train)
+bs.rmse.test <- getRMSE(test$Overnightrate,bs.pred.test)
+#Compare the RMSE of both data set
+bs.rmse <- c(bs.rmse.train,bs.rmse.test)
+bs.rmse 
+```
+
+Test RMSE is lower than train RMSE, suggesting that there might be a sampling bias. To fix this we can either use different sample or use a different model. In our case since we do not have a different sample. We use Ridge Regression model to determine a potentially better fit for our data.
+
+```{r Ridge RMSE, include=FALSE}
+
+x.train <- data.matrix(train[, c('TotalCPI', 'CPItrim', 'CPImedian', 'CPIcommon', 'RealReturnbonds' ,'LFS', 'SEPH', 'NominalCEER', 'GrossM1', 'GrossM2', 'GrossM3', 'GDPIndex', 'CanadianOvernightRepoRate', 'ImmediateInterbankrate', 'UnemploymentRate', 'Primerate')])
+
+x.test<- data.matrix(test[, c('TotalCPI', 'CPItrim', 'CPImedian', 'CPIcommon', 'RealReturnbonds' ,'LFS', 'SEPH', 'NominalCEER', 'GrossM1', 'GrossM2', 'GrossM3', 'GDPIndex', 'CanadianOvernightRepoRate', 'ImmediateInterbankrate', 'UnemploymentRate', 'Primerate')])
+```
+
+```{r Ridge RMSE pred, echo=FALSE}
+r.pred.train <- predict(model,newdata=train, newx=x.train)
+r.pred.test <- predict(model,newdata=test, newx=x.test )
+
+
+r.rmse.train <- getRMSE(train$Overnightrate,r.pred.train)
+
+r.rmse.test <- getRMSE(test$Overnightrate,r.pred.test)
+r.rmse <- c(r.rmse.train,r.rmse.test)
+r.rmse
+```
+
+Since the train RMSE is higher than the test RMSE for the Ridge Regression, implying a sampling bias in the model. We can conclude that linear modeling are not viable options for our data set. Next we use Random forest model to fine a RMSE value.
+
+```{r Random Forest, echo=TRUE}
+
+rf.pred.train <- predict(rf.mod,newdata=train)
+rf.pred.test <- predict(rf.mod,newdata=test)
+
+
+rf.rmse.train <- getRMSE(train$Overnightrate,rf.pred.train)
+
+rf.rmse.test <- getRMSE(test$Overnightrate,rf.pred.test)
+rf.rmse <- c(rf.rmse.train,rf.rmse.test)
+rf.rmse
+
+```
+
+Since the test RMSE value is higher than train RMSE, this shows that random forest tackles the sampling bias issue faced with linear modelling. This output suggests that non-linear modelling is a better fit for our data. In order to diversify our option of models we will use Gradient Boosting model for further comparison.
+
+### a. Boosting Method
+
+Due to there being potential sampling bias in Best subset and Ridge model, we use the boosting algorithm to decrease the bias error. Firstly we need to tune the data using `trainControl` function from the `caret` package and use cross validation on the training data set. Second, we boost our penalty terms, tree depth, and number of tree built. Third create a data frame using the boosted terms. Lastly, we use this on the train data and plot the graph.
+
+```{r boosting_tuning, echo=FALSE}
+
+set.seed(667)
+
+gbm_fitControl <- trainControl(## 10-fold CV
+                           method = "repeatedcv",
+                           number = 10,
+                           ## repeated ten times
+                           repeats = 10)
+
+lambda <- c(0.001,0.005,0.025,0.125)
+depth <- c(2,4,6)
+trees <- c(500,1000,1500)
+
+gbmGrid <-  expand.grid(interaction.depth = depth, 
+                        n.trees = trees, 
+                        shrinkage = lambda,
+                        n.minobsinnode = 20)
+
+
+gbmfit <- train(Overnightrate ~ ., data = train, 
+                 method = "gbm", 
+                 trControl = gbm_fitControl,
+                 distribution="gaussian",
+                 bag.fraction=0.8,
+                 verbose = FALSE, 
+                 preProcess = c("center", "scale"),
+                 tuneGrid = gbmGrid)
+
+```
+
+```{r GBM Plotting, echo=TRUE}
+
+gbmfit
+plot(gbmfit)
+
+```
+
+Here the algorithm indicates that the optimal number of trees is 1500, shrinkage penalty= 0.025 and depth of the tree = 4 given that the last leaf has 20 observation. Suggesting that to be the best fit for the boosting model. Next we use the package `gbm` to create a generalized boosted regression model using the depth and the penalty found from cross validation.
+
+```{r boosting_model, echo=TRUE}
+library(gbm)
+
+set.seed(667)
+
+boost.mod <- gbm(data=train, Overnightrate~., 
+                 distribution="gaussian", 
+                 n.trees=1500, interaction.depth=4, 
+                 shrinkage =0.025, 
+                 bag.fraction=0.8)
+
+boost.pred.train <- predict(boost.mod,newdata=train)
+boost.pred.test <- predict(boost.mod,newdata=test)
+
+
+boost.rmse.train = getRMSE(train$Overnightrate,boost.pred.train)
+boost.rmse.test = getRMSE(test$Overnightrate, boost.pred.test)
+boost.rmse <- c(boost.rmse.train,boost.rmse.test)
+boost.rmse
+```
+
+Here, the test RMSE is much higher than our train model confirming our decision to use non-linear models. Finally, We compare all the RMSE values for all the models and choose the lowest RMSE to predict our data set.
+
+```{r comparison RMSE, echo=TRUE}
+
+boost.rmse # boosting model RMSE values
+rf.rmse #Random Forest RMSE
+bs.rmse #Best Subset RMSE
+r.rmse #Ridge RMSE
+```
+
+We observe, that the gradient boosting model is a better fit for our model since it has the lowest RMSE value. However, to justify this conclusion we will also look at the Mean Absolute Error (MAE) value besides the RMSE values to compare which of these models are a better fit. It measures accuracy for continuous variables. The MAE is the average over the sample of the absolute values of the differences between prediction and the corresponding observation. The MAE is a linear score which means that all the individual differences are weighted equally in the average.
+
+```{r MAE, echo=TRUE,  warning = FALSE}
+# Best Subset 
+MAE(test$Overnightrate, predict(bs.lm.mod))
+
+#Ridge Regression
+MAE(test$Overnightrate, predict(model, newx=x.test))
+
+#Random Forest
+MAE(test$Overnightrate, predict(rf.mod))
+
+#Gradient Boosting
+MAE(test$Overnightrate, predict(boost.mod))
+
+```
+
+The MAE error values suggest that Ridge regression has the best MAE value. However, we see a potential sampling bias in both linear models which allows us to only use non-linear models for predicting our data. In this case, Gradient boosting model has a slightly higher MAE error value than random forest model. So we will attempt to predict our test data using these two non-linear models.
+
+## 3. Recommendation
+
+Given the RMSEs we observe that Random Forest would be one of the best model as it does no have any sampling bias and has 2nd to lowest RMSE and MAE. Thus suggesting that Random forest and Gradient boosting models are the best fit models for predicting Canadian Overnight Interest rate using the variables chosen. Having more data would have allowed us to predict Overnight interest rate based on the new data which would be unused in this analysis.
+
+# Conclusion
+
+When we encounter changes in interest rates, money supply, long-term bonds, and wage rates again in the future, these models could provide a way to predict the Canadian Overnight Interest rate. The random forest and Gradient Boosting models have better prediction performance compared to the Best subset and Ridge regression models. Thus allowing us to Predict changes in Overnight lending rate enables commercial banks to better adjust their prime rate in various regions to ensure consumption of their services. However, the data set utilized for this paper is very small and the predictive models when applied to other countries may no longer be applicable. Since there may be other variables that have a significant impact on the overnight market but are not included in this data set. Additionally, If we had more data, we could have used different samples to potentially fix the sampling bias in linear models.
+
+# Bibliography
+
+-   Caspari, C. (2021). \\\*A machine learning approach to one-step
+
+    overnight rate forcasting\\\* (thesis). University of Twente.
